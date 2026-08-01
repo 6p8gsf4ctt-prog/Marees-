@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Marées">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <title>Marées</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <p class="eyebrow">TARNOS</p>
+      <h1 id="pageTitle">Aujourd’hui</h1>
+      <p id="fullDate" class="date-line"></p>
+    </header>
+
+    <section id="todayView" class="view active" aria-label="Aujourd’hui">
+      <article class="hero-card card">
+        <div class="hero-topline">
+          <span id="tideDirection" class="status-pill">—</span>
+          <span id="currentTime" class="current-time">—</span>
+        </div>
+        <p id="nextLabel" class="next-label">PROCHAINE MARÉE</p>
+        <div id="countdown" class="countdown">—</div>
+        <div class="next-event-row">
+          <div>
+            <div id="nextTime" class="event-time large">—</div>
+            <div id="nextType" class="event-type">—</div>
+          </div>
+          <div class="event-meta right">
+            <strong id="nextHeight">—</strong>
+            <span id="nextCoeff">—</span>
+          </div>
+        </div>
+      </article>
+
+      <section class="section-block">
+        <h2>Marées</h2>
+        <div id="todayEvents" class="events-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <h2>Soleil</h2>
+        <article class="card solar-card">
+          <div class="solar-row"><span>Aube</span><strong id="dawn">—</strong></div>
+          <div class="solar-row"><span>Lever</span><strong id="sunrise">—</strong></div>
+          <div class="solar-row"><span>Coucher</span><strong id="sunset">—</strong></div>
+          <div class="solar-row"><span>Dernières lueurs</span><strong id="dusk">—</strong></div>
+        </article>
+      </section>
+    </section>
+
+    <section id="weekView" class="view" aria-label="Sept jours">
+      <div id="weekList" class="week-list"></div>
+    </section>
+    <footer class="data-footer">
+      <span id="dataStatus"></span>
+      <a href="https://api-maree.fr/" target="_blank" rel="noreferrer">api-maree.fr</a>
+      <span>·</span>
+      <a href="https://sunrisesunset.io/" target="_blank" rel="noreferrer">SunriseSunset.io</a>
+    </footer>
+  </main>
+
+  <nav class="tab-bar" aria-label="Navigation principale">
+    <button class="tab active" data-view="todayView" aria-current="page">
+      <span class="tab-icon">◉</span><span>Aujourd’hui</span>
+    </button>
+    <button class="tab" data-view="weekView">
+      <span class="tab-icon">▦</span><span>7 jours</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
