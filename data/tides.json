@@ -1,0 +1,14 @@
+{
+  "location": "Tarnos",
+  "referencePort": "Boucau-Bayonne",
+  "timezone": "Europe/Paris",
+  "days": [
+    {"date":"2026-08-01","events":[{"type":"low","time":"00:57","height":0.89},{"type":"high","time":"07:07","height":3.85,"coefficient":83},{"type":"low","time":"13:05","height":1.00},{"type":"high","time":"19:22","height":4.08,"coefficient":83}]},
+    {"date":"2026-08-02","events":[{"type":"low","time":"01:30","height":0.88},{"type":"high","time":"07:39","height":3.85,"coefficient":83},{"type":"low","time":"13:39","height":1.02},{"type":"high","time":"19:57","height":4.04,"coefficient":82}]},
+    {"date":"2026-08-03","events":[{"type":"low","time":"02:05","height":0.92},{"type":"high","time":"08:14","height":3.81,"coefficient":80},{"type":"low","time":"14:16","height":1.08},{"type":"high","time":"20:35","height":3.95,"coefficient":77}]},
+    {"date":"2026-08-04","events":[{"type":"low","time":"02:42","height":1.02},{"type":"high","time":"08:53","height":3.73,"coefficient":74},{"type":"low","time":"14:57","height":1.20},{"type":"high","time":"21:18","height":3.81,"coefficient":70}]},
+    {"date":"2026-08-05","events":[{"type":"low","time":"03:24","height":1.17},{"type":"high","time":"09:38","height":3.60,"coefficient":66},{"type":"low","time":"15:45","height":1.34},{"type":"high","time":"22:10","height":3.64,"coefficient":61}]},
+    {"date":"2026-08-06","events":[{"type":"low","time":"04:13","height":1.35},{"type":"high","time":"10:35","height":3.47,"coefficient":57},{"type":"low","time":"16:45","height":1.49},{"type":"high","time":"23:15","height":3.47,"coefficient":52}]},
+    {"date":"2026-08-07","events":[{"type":"low","time":"05:16","height":1.49},{"type":"high","time":"11:48","height":3.41,"coefficient":49},{"type":"low","time":"18:03","height":1.55}]}
+  ]
+}
