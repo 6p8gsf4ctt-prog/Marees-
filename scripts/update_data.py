@@ -80,6 +80,8 @@ def main() -> int:
         "time_format": 24,
     })
     sun_payload = get_json(f"{SUN_API}?{sun_query}")
+    if sun_payload.get("status") not in ("OK", "INVALID_TZID"):
+        raise RuntimeError(f"API solaire: {sun_payload.get('status', 'réponse invalide')}")
     sun_results = sun_payload.get("results", [])
     if isinstance(sun_results, dict):
         sun_results = [sun_results]

@@ -1,4 +1,7 @@
 const TZ = 'Europe/Paris';
+const SOLAR_API = 'https://api.sunrisesunset.io/json';
+const LAT = 43.541;
+const LNG = -1.462;
 let tideData;
 
 const $ = (id) => document.getElementById(id);
@@ -18,7 +21,65 @@ function eventDate(dateKey, time) {
 function formatHeight(v) { return `${Number(v).toFixed(2).replace('.', ',')} m`; }
 function eventName(type) { return type === 'high' ? 'Pleine mer' : 'Basse mer'; }
 function shortType(type) { return type === 'high' ? 'PM' : 'BM'; }
-function cleanTime(value) { return value ? String(value).slice(0, 5) : '—'; }
+function cleanTime(value) {
+  if (!value) return '—';
+  const text = String(value).trim();
+  const match24 = text.match(/^(\d{1,2}):(\d{2})/);
+  if (match24 && !/[AP]M/i.test(text)) return `${pad(Number(match24[1]))}:${match24[2]}`;
+  const match12 = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)$/i);
+  if (match12) {
+    let hour = Number(match12[1]) % 12;
+    if (match12[3].toUpperCase() === 'PM') hour += 12;
+    return `${pad(hour)}:${match12[2]}`;
+  }
+  return text.slice(0, 5);
+}
+
+function solarCacheKey(date) { return `marees-solar-${date}`; }
+
+function readSolarCache(date) {
+  try { return JSON.parse(localStorage.getItem(solarCacheKey(date)) || 'null'); }
+  catch { return null; }
+}
+
+function writeSolarCache(date, solar) {
+  try { localStorage.setItem(solarCacheKey(date), JSON.stringify(solar)); }
+  catch { /* stockage privé ou saturé */ }
+}
+
+async function loadMissingSolar() {
+  const missing = tideData.days.filter(day => {
+    const s = day.solar || readSolarCache(day.date);
+    if (s) day.solar = s;
+    return !(s && s.dawn && s.sunrise && s.sunset && s.dusk);
+  });
+  if (!missing.length) return;
+
+  const dates = missing.map(day => day.date).sort();
+  const params = new URLSearchParams({
+    lat: String(LAT), lng: String(LNG),
+    date_start: dates[0], date_end: dates[dates.length - 1],
+    timezone: TZ, time_format: '24', elevation: 'false'
+  });
+  const response = await fetch(`${SOLAR_API}?${params}`, {cache: 'no-store'});
+  if (!response.ok) throw new Error('Heures solaires indisponibles');
+  const payload = await response.json();
+  if (!['OK', 'INVALID_TZID'].includes(payload.status)) throw new Error(payload.status || 'Réponse solaire invalide');
+  const results = Array.isArray(payload.results) ? payload.results : [payload.results];
+  const byDate = new Map(results.filter(Boolean).map(item => [item.date, item]));
+
+  missing.forEach(day => {
+    const item = byDate.get(day.date);
+    if (!item) return;
+    day.solar = {
+      dawn: cleanTime(item.dawn),
+      sunrise: cleanTime(item.sunrise),
+      sunset: cleanTime(item.sunset),
+      dusk: cleanTime(item.dusk)
+    };
+    writeSolarCache(day.date, day.solar);
+  });
+}
 
 function getTodayRecord(now = new Date()) {
   const key = localDateKey(now);
@@ -104,6 +165,7 @@ async function init() {
   tideData = await response.json();
   if (!Array.isArray(tideData.days) || !tideData.days.length) throw new Error('Données indisponibles');
   renderToday(); renderWeek(); renderDataStatus(); bindTabs();
+  loadMissingSolar().then(() => renderSolar(getTodayRecord())).catch(error => console.warn(error));
   setInterval(() => updateLive(new Date()), 30000);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
 }

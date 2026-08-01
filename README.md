@@ -46,3 +46,8 @@ Dans Safari : **Partager → Sur l’écran d’accueil → Ajouter**.
 ## Fonctionnement hors connexion
 
 L’application conserve la dernière version téléchargée des données. En cas de panne temporaire de la source, les dernières données disponibles restent visibles.
+
+
+## Correction 2.1 — Soleil
+
+Les heures solaires sont désormais chargées directement par l’application lorsqu’elles ne sont pas encore présentes dans `data/tides.json`. Elles sont ensuite conservées localement. Cette récupération ne nécessite aucune clé.
