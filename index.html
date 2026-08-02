@@ -38,6 +38,26 @@
         </div>
         <p id="nextLabel" class="next-label">PROCHAINE MARÉE</p>
         <div id="countdown" class="countdown">—</div>
+        <div class="hero-curve" aria-hidden="true">
+          <svg id="heroCurve" viewBox="0 0 320 112" preserveAspectRatio="none" role="presentation">
+            <defs>
+              <linearGradient id="heroCurveLine" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0a84ff" stop-opacity="0.58" />
+                <stop offset="48%" stop-color="#4cb6ff" stop-opacity="0.95" />
+                <stop offset="100%" stop-color="#0a84ff" stop-opacity="0.72" />
+              </linearGradient>
+              <linearGradient id="heroCurveFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0a84ff" stop-opacity="0.22" />
+                <stop offset="68%" stop-color="#0a84ff" stop-opacity="0.06" />
+                <stop offset="100%" stop-color="#0a84ff" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path id="heroCurveFillPath" d="" fill="url(#heroCurveFill)"></path>
+            <path id="heroCurvePath" d="" fill="none" stroke="url(#heroCurveLine)" stroke-width="2.5" stroke-linecap="round"></path>
+            <circle id="heroCurveMarkerHalo" cx="0" cy="0" r="0" fill="#0a84ff" opacity="0.18"></circle>
+            <circle id="heroCurveMarker" cx="0" cy="0" r="0" fill="#f5f5f7" stroke="#0a84ff" stroke-width="2"></circle>
+          </svg>
+        </div>
         <div class="next-event-row">
           <div>
             <div id="nextDate" class="event-date hero-event-date">—</div>

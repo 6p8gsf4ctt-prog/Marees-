@@ -92,6 +92,111 @@ function renderSolar(day) {
   $('dawn').textContent=cleanTime(s.dawn); $('sunrise').textContent=cleanTime(s.sunrise);
   $('sunset').textContent=cleanTime(s.sunset); $('dusk').textContent=cleanTime(s.dusk);
 }
+function minutesOf(time) { const [hh,mm] = String(time || '00:00').split(':').map(Number); return hh * 60 + mm; }
+function dayEventsWithNeighbors(dayIndex) {
+  const current = tideData.days[dayIndex];
+  const prevDay = tideData.days[dayIndex - 1];
+  const nextDay = tideData.days[dayIndex + 1];
+  const events = [];
+  if (prevDay?.events?.length) {
+    const prev = prevDay.events[prevDay.events.length - 1];
+    events.push({...prev, date: prevDay.date, minutes: minutesOf(prev.time) - 1440});
+  }
+  current.events.forEach(event => events.push({...event, date: current.date, minutes: minutesOf(event.time)}));
+  if (nextDay?.events?.length) {
+    const next = nextDay.events[0];
+    events.push({...next, date: nextDay.date, minutes: minutesOf(next.time) + 1440});
+  }
+  return events.sort((a,b) => a.minutes - b.minutes);
+}
+function interpolateHeight(pointA, pointB, targetMinutes) {
+  const span = pointB.minutes - pointA.minutes || 1;
+  const t = Math.min(1, Math.max(0, (targetMinutes - pointA.minutes) / span));
+  const eased = (1 - Math.cos(Math.PI * t)) / 2;
+  return pointA.height + (pointB.height - pointA.height) * eased;
+}
+function boundaryPoint(events, targetMinutes) {
+  const direct = events.find(event => event.minutes === targetMinutes);
+  if (direct) return {minutes: targetMinutes, height: direct.height};
+  let before = events[0], after = events[events.length - 1];
+  for (let i = 0; i < events.length - 1; i += 1) {
+    if (events[i].minutes <= targetMinutes && events[i + 1].minutes >= targetMinutes) {
+      before = events[i];
+      after = events[i + 1];
+      break;
+    }
+  }
+  return {minutes: targetMinutes, height: interpolateHeight(before, after, targetMinutes)};
+}
+function curvePointsForDay(dayIndex) {
+  const neighborEvents = dayEventsWithNeighbors(dayIndex);
+  const current = tideData.days[dayIndex];
+  const inner = current.events.map(event => ({minutes: minutesOf(event.time), height: event.height}));
+  return [boundaryPoint(neighborEvents, 0), ...inner, boundaryPoint(neighborEvents, 1440)].sort((a,b) => a.minutes - b.minutes);
+}
+function curvePath(points, width, height, bottomPadding = 10) {
+  const heights = points.map(point => point.height);
+  const min = Math.min(...heights);
+  const max = Math.max(...heights);
+  const spread = Math.max(0.35, max - min);
+  const topPad = 12;
+  const usableHeight = height - topPad - bottomPadding;
+  const normalized = points.map(point => ({
+    x: (point.minutes / 1440) * width,
+    y: topPad + (1 - ((point.height - min) / spread)) * usableHeight,
+  }));
+  if (normalized.length < 2) return { line: '', fill: '', markerAt: normalized[0] || {x:0,y:height / 2}, mapped: normalized };
+  let line = `M ${normalized[0].x.toFixed(2)} ${normalized[0].y.toFixed(2)}`;
+  for (let i = 0; i < normalized.length - 1; i += 1) {
+    const p0 = normalized[Math.max(0, i - 1)];
+    const p1 = normalized[i];
+    const p2 = normalized[i + 1];
+    const p3 = normalized[Math.min(normalized.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    line += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+  const baseline = height - 1;
+  const fill = `${line} L ${normalized[normalized.length - 1].x.toFixed(2)} ${baseline} L ${normalized[0].x.toFixed(2)} ${baseline} Z`;
+  return { line, fill, mapped: normalized };
+}
+function pointOnCurve(points, targetMinutes, width, height) {
+  const heights = points.map(point => point.height);
+  const min = Math.min(...heights);
+  const max = Math.max(...heights);
+  const spread = Math.max(0.35, max - min);
+  const topPad = 12;
+  const bottomPad = 10;
+  const usableHeight = height - topPad - bottomPad;
+  const before = [...points].reverse().find(point => point.minutes <= targetMinutes) || points[0];
+  const after = points.find(point => point.minutes >= targetMinutes) || points[points.length - 1];
+  const heightValue = before.minutes === after.minutes ? before.height : interpolateHeight(before, after, targetMinutes);
+  return {
+    x: (targetMinutes / 1440) * width,
+    y: topPad + (1 - ((heightValue - min) / spread)) * usableHeight,
+  };
+}
+function renderHeroCurve(day, now = new Date()) {
+  const svgWidth = 320;
+  const svgHeight = 112;
+  const points = curvePointsForDay(selectedDayIndex);
+  const { line, fill } = curvePath(points, svgWidth, svgHeight);
+  $('heroCurvePath').setAttribute('d', line || '');
+  $('heroCurveFillPath').setAttribute('d', fill || '');
+
+  const isToday = day.date === localDateKey(now);
+  const marker = isToday
+    ? pointOnCurve(points, now.getHours() * 60 + now.getMinutes(), svgWidth, svgHeight)
+    : pointOnCurve(points, minutesOf(day.events[0]?.time || '00:00'), svgWidth, svgHeight);
+  $('heroCurveMarker').setAttribute('cx', marker.x.toFixed(2));
+  $('heroCurveMarker').setAttribute('cy', marker.y.toFixed(2));
+  $('heroCurveMarker').setAttribute('r', isToday ? '6' : '4.5');
+  $('heroCurveMarkerHalo').setAttribute('cx', marker.x.toFixed(2));
+  $('heroCurveMarkerHalo').setAttribute('cy', marker.y.toFixed(2));
+  $('heroCurveMarkerHalo').setAttribute('r', isToday ? '12' : '9');
+}
 function eventCard(e,dateKey) {
   return `<article class="card event-card"><div class="event-date">${shortEventDate(dateKey)}</div><div class="event-time">${e.time}</div><div class="event-type">${eventName(e.type)}</div><div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div></article>`;
 }
@@ -108,6 +213,7 @@ function renderSelectedDay(now=new Date()) {
   updateHeaderForDay(day,now);
   $('todayEvents').innerHTML=day.events.map(e=>eventCard(e,day.date)).join('');
   renderSolar(day);
+  renderHeroCurve(day, now);
   $('previousDay').disabled=selectedDayIndex===0;
   $('nextDay').disabled=selectedDayIndex===tideData.days.length-1;
   if (day.date===localDateKey(now)) updateLive(now); else renderForecastHero(day);
@@ -134,6 +240,7 @@ function updateLive(now=new Date()) {
   $('countdown').textContent=countdownText(next.at-now);
   $('nextDate').textContent=shortEventDate(next.date); $('nextTime').textContent=next.time; $('nextType').textContent=eventName(next.type);
   $('nextHeight').textContent=formatHeight(next.height); $('nextCoeff').textContent=next.coefficient?`Coefficient ${next.coefficient}`:'';
+  renderHeroCurve(selectedDay(), now);
 }
 
 function weekCount() { return Math.max(1, Math.ceil(tideData.days.length / 7)); }
