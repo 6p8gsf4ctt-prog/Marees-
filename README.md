@@ -1,19 +1,58 @@
-# Marées Tarnos — V3
+# Marées Tarnos — application + API
 
-Application personnelle pour iPhone, publiée directement avec GitHub Pages.
+Ce dépôt contient une application complète hébergée par **Cloudflare Workers Static Assets** et une API privée exécutée dans le même Worker.
 
-## Installation
+## Ce qui est déjà prêt
 
-1. Envoyer tous les fichiers à la racine du dépôt GitHub `Marees`.
-2. Dans **Settings → Pages**, choisir `main` et `/ (root)`.
-3. Ouvrir le site dans Safari puis choisir **Partager → Sur l’écran d’accueil**.
+- interface mobile/PWA ;
+- horaires, hauteurs et coefficients de marée ;
+- courbe de marée ;
+- horaires solaires ;
+- 30 jours de données ;
+- cache Cloudflare de 6 heures ;
+- aucune clé visible dans le navigateur ;
+- déploiement automatique à chaque modification du dépôt GitHub.
 
-Aucune clé API, aucun secret, aucun script Python et aucune GitHub Action ne sont nécessaires.
+## Installation — deux opérations personnelles indispensables
 
-## Actualisation
+### 1. Obtenir la clé de marée
 
-L’application récupère les prévisions marines Open-Meteo et les horaires solaires SunriseSunset.io à chaque ouverture. La dernière réponse valide est conservée localement sur l’iPhone et sert de secours si le réseau est temporairement indisponible.
+Créez un compte sur `api-maree.fr`, connectez-vous et copiez votre clé API.
 
-## Important
+### 2. Importer ce dépôt dans Cloudflare
 
-Les marées sont estimées à partir du niveau marin du modèle Open-Meteo. Les hauteurs sont adaptées à une lecture locale et les coefficients français ne sont pas disponibles. Ces données ne remplacent pas les prédictions officielles du SHOM et ne doivent pas être utilisées pour la navigation.
+1. Téléversez tous les fichiers de ce dossier dans un dépôt GitHub nommé, par exemple, `Marees`.
+2. Dans Cloudflare : **Workers & Pages → Create application → Import a repository**.
+3. Sélectionnez le dépôt GitHub.
+4. Vérifiez les paramètres :
+   - nom du Worker : `marees-tarnos` ;
+   - commande de déploiement : `npm run deploy` ;
+   - aucune commande de build nécessaire.
+5. Cliquez sur **Save and Deploy**.
+6. Dans le Worker : **Settings → Variables and Secrets → Add → Secret**.
+7. Nom : `API_MAREE_KEY`.
+8. Valeur : votre clé `api-maree.fr`.
+9. Redéployez le Worker depuis **Deployments** ou poussez un nouveau commit GitHub.
+
+L’application sera disponible sur une adresse de type :
+
+`https://marees-tarnos.<votre-sous-domaine>.workers.dev`
+
+## Vérifications
+
+- `/api/health` doit répondre avec `{ "ok": true }`.
+- `/api/tides?days=30` doit retourner un JSON contenant `days`.
+- La page d’accueil doit charger les données automatiquement.
+
+## Mise à jour
+
+Après l’installation initiale, aucune intervention quotidienne n’est nécessaire. Le Worker renouvelle les données automatiquement au premier appel après expiration du cache de six heures. Chaque modification poussée sur GitHub est redéployée automatiquement par Cloudflare.
+
+## Développement local facultatif
+
+```bash
+npm install
+cp .dev.vars.example .dev.vars
+# Remplacer la valeur dans .dev.vars
+npm run dev
+```

@@ -1,7 +1,5 @@
 const TZ = 'Europe/Paris';
 const SOLAR_API = 'https://api.sunrisesunset.io/json';
-const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine';
-const CACHE_KEY = 'marees-tarnos-v3-data';
 const LAT = 43.541;
 const LNG = -1.462;
 let tideData;
@@ -67,59 +65,6 @@ async function loadMissingSolar() {
     day.solar = {dawn:cleanTime(item.dawn),sunrise:cleanTime(item.sunrise),sunset:cleanTime(item.sunset),dusk:cleanTime(item.dusk)};
     writeSolarCache(day.date,day.solar);
   });
-}
-
-function cacheData(data) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({savedAt:Date.now(),data})); } catch {} }
-function readCachedData() { try { const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return cached?.data?.days?.length?cached.data:null; } catch { return null; } }
-function localDateTimeParts(iso) { const [date,time='00:00']=String(iso).split('T'); return {date,time:time.slice(0,5)}; }
-function parabolicExtremum(prev,current,next) {
-  const y1=prev.value,y2=current.value,y3=next.value;
-  const denominator=y1-2*y2+y3;
-  const offset=Math.abs(denominator)<1e-9?0:Math.max(-.5,Math.min(.5,.5*(y1-y3)/denominator));
-  return {timestamp:current.timestamp+offset*3600000,value:y2-.25*(y1-y3)*offset};
-}
-function extractExtrema(samples) {
-  const extrema=[];
-  for(let i=1;i<samples.length-1;i+=1){
-    const a=samples[i-1],b=samples[i],c=samples[i+1];
-    const high=b.value>=a.value&&b.value>c.value;
-    const low=b.value<=a.value&&b.value<c.value;
-    if(!high&&!low) continue;
-    const refined=parabolicExtremum(a,b,c), dateObj=new Date(refined.timestamp);
-    extrema.push({type:high?'high':'low',date:localDateKey(dateObj),time:frDate(dateObj,{hour:'2-digit',minute:'2-digit'}),height:refined.value});
-  }
-  return extrema;
-}
-function normalizeDisplayHeights(extrema) {
-  const lows=extrema.filter(e=>e.type==='low').map(e=>e.height);
-  if(!lows.length) return extrema;
-  const offset=.45-Math.min(...lows);
-  return extrema.map(e=>({...e,height:e.height+offset}));
-}
-function buildDaysFromMarine(payload) {
-  const times=payload?.hourly?.time||[], values=payload?.hourly?.sea_level_height_msl||[];
-  if(!times.length||times.length!==values.length) throw new Error('Données marines incomplètes');
-  const samples=times.map((iso,index)=>({timestamp:new Date(iso).getTime(),value:Number(values[index])})).filter(s=>Number.isFinite(s.value));
-  const extrema=normalizeDisplayHeights(extractExtrema(samples)), byDate=new Map();
-  extrema.forEach(event=>{ if(!byDate.has(event.date)) byDate.set(event.date,[]); byDate.get(event.date).push({type:event.type,time:event.time,height:Number(event.height.toFixed(2))}); });
-  const dates=[...new Set(times.map(t=>localDateTimeParts(t).date))].slice(0,14);
-  const days=dates.map(date=>({date,events:(byDate.get(date)||[]).sort((a,b)=>a.time.localeCompare(b.time))})).filter(day=>day.events.length>=2);
-  return {location:'Tarnos',reference_port:'Modèle marin Open-Meteo',timezone:TZ,updated_at:new Date().toISOString(),source:'Open-Meteo Marine API',days};
-}
-async function fetchMarineData() {
-  let lastError;
-  for(const forecastDays of [16,14,10,8]){
-    const params=new URLSearchParams({latitude:String(LAT),longitude:String(LNG),hourly:'sea_level_height_msl',timezone:TZ,forecast_days:String(forecastDays),cell_selection:'sea'});
-    try {
-      const response=await fetch(`${MARINE_API}?${params}`,{cache:'no-store'});
-      if(!response.ok) throw new Error(`Marine HTTP ${response.status}`);
-      const data=buildDaysFromMarine(await response.json());
-      if(data.days.length<2) throw new Error('Prévisions marines insuffisantes');
-      cacheData(data); return data;
-    } catch(error) { lastError=error; }
-  }
-  const cached=readCachedData(); if(cached) return cached;
-  throw lastError||new Error('Données marines indisponibles');
 }
 
 function todayIndex(now = new Date()) {
@@ -400,7 +345,9 @@ function bindTabs() {
   }));
 }
 async function init() {
-  tideData=await fetchMarineData();
+  const response=await fetch(`/api/tides?days=30&v=${Date.now()}`,{cache:'no-store'});
+  if(!response.ok) throw new Error('Données indisponibles');
+  tideData=await response.json();
   if(!Array.isArray(tideData.days)||!tideData.days.length) throw new Error('Données indisponibles');
   selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/14);
   renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation(); scrollSelectedDayIntoView();
