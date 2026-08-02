@@ -206,7 +206,7 @@ function pointOnCurve(points, targetMinutes, width, height) {
     y: topPad + (1 - ((heightValue - min) / spread)) * usableHeight,
   };
 }
-function renderHeroCurve(day, now = new Date()) {
+function renderHeroCurve(day, now = new Date(), animate = true) {
   const svgWidth = 320;
   const svgHeight = 112;
   const points = curvePointsForDay(selectedDayIndex);
@@ -230,10 +230,17 @@ function renderHeroCurve(day, now = new Date()) {
     const point = innerMapped[index];
     if (!point) return '';
     const left = Math.min(94, Math.max(6, (point.x / svgWidth) * 100));
-    const rawTop = (point.y / svgHeight) * 112;
-    const top = event.type === 'high' ? Math.max(8, rawTop - 13) : Math.min(105, rawTop + 13);
-    return `<span class="curve-time-label" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px">${event.time}</span>`;
+    const rawTop = (point.y / svgHeight) * 118;
+    const top = event.type === 'high' ? Math.max(13, rawTop - 19) : Math.min(117, rawTop + 20);
+    return `<span class="curve-extrema" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px"><span class="curve-kind">${event.type === 'high' ? 'PM' : 'BM'}</span><span class="curve-clock">${event.time}</span><span class="curve-height">${formatHeight(event.height)}</span></span>`;
   }).join('');
+
+  const curve = $('heroCurve')?.closest('.hero-curve');
+  if (curve && animate) {
+    curve.classList.remove('animating');
+    void curve.offsetWidth;
+    curve.classList.add('animating');
+  }
 }
 
 function eventCard(e,dateKey) {
@@ -247,6 +254,14 @@ function updateHeaderForDay(day, now=new Date()) {
   $('todayButton').hidden=isToday;
   $('todayButton').textContent=`Retour au ${shortEventDate(localDateKey(now))}`;
 }
+function animateDayChange() {
+  const view = $('todayView');
+  if (!view) return;
+  view.classList.remove('day-change-flash');
+  void view.offsetWidth;
+  view.classList.add('day-change-flash');
+  window.setTimeout(() => view.classList.remove('day-change-flash'), 360);
+}
 function renderSelectedDay(now=new Date()) {
   const day=selectedDay();
   updateHeaderForDay(day,now);
@@ -256,6 +271,7 @@ function renderSelectedDay(now=new Date()) {
   $('previousDay').disabled=selectedDayIndex===0;
   $('nextDay').disabled=selectedDayIndex===tideData.days.length-1;
   renderDayRail();
+  animateDayChange();
   if (day.date===localDateKey(now)) updateLive(now); else renderForecastHero(day);
 }
 function renderForecastHero(day) {
@@ -280,7 +296,7 @@ function updateLive(now=new Date()) {
   $('countdown').textContent=countdownText(next.at-now);
   $('nextDate').textContent=shortEventDate(next.date); $('nextTime').textContent=next.time; $('nextType').textContent=eventName(next.type);
   $('nextHeight').textContent=formatHeight(next.height); $('nextCoeff').textContent=next.coefficient?`Coefficient ${next.coefficient}`:'';
-  renderHeroCurve(selectedDay(), now);
+  renderHeroCurve(selectedDay(), now, false);
 }
 
 function weekCount() { return Math.max(1, Math.ceil(tideData.days.length / 14)); }
@@ -351,6 +367,7 @@ async function init() {
   if(!Array.isArray(tideData.days)||!tideData.days.length) throw new Error('Données indisponibles');
   selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/14);
   renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation(); scrollSelectedDayIntoView();
+  requestAnimationFrame(() => document.body.classList.add('app-ready'));
   loadMissingSolar().then(()=>renderSolar(selectedDay())).catch(error=>console.warn(error));
   setInterval(()=>updateLive(new Date()),30000);
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');

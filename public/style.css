@@ -31,3 +31,54 @@ h2{margin:0 4px 10px;font-size:22px;letter-spacing:-.025em}.view{display:none}.v
 @media(prefers-color-scheme:dark){:root{--bg:#000;--card:rgba(28,28,30,.96);--text:#f5f5f7;--secondary:#98989d;--line:rgba(255,255,255,.11);--accent:#0a84ff;--accent-soft:rgba(10,132,255,.16);--sea:#64d2ff;--shadow:none}body{background:radial-gradient(circle at 85% 0%,rgba(10,132,255,.09),transparent 24rem),#000}.tab-bar{background:rgba(20,20,22,.88)}.day-event{background:rgba(118,118,128,.16)}.day-arrow{background:#1c1c1e}}
 
 @media(max-width:380px){.moon-mark{right:48px;width:25px;height:25px}.day-chip{flex-basis:62px;min-height:68px}.day-chip .rail-day{font-size:22px}}
+
+/* V4 — raffinements visuels */
+body.app-ready .page-header,
+body.app-ready .day-rail-section,
+body.app-ready .hero-card,
+body.app-ready .section-block,
+body.app-ready .data-footer {
+  animation: contentReveal .42s cubic-bezier(.22,.61,.36,1) both;
+}
+body.app-ready .day-rail-section{animation-delay:.035s}
+body.app-ready .hero-card{animation-delay:.07s}
+body.app-ready .section-block:nth-of-type(2){animation-delay:.11s}
+body.app-ready .section-block:nth-of-type(3){animation-delay:.15s}
+body.app-ready .data-footer{animation-delay:.19s}
+@keyframes contentReveal{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+.day-rail-section{margin-bottom:16px}
+.day-rail{gap:7px;padding:1px 4px 7px;scroll-padding-inline:42%}
+.day-chip{flex-basis:58px;min-height:64px;padding:9px 6px;border-radius:16px;background:rgba(255,255,255,.82);box-shadow:none;transition:transform .2s cubic-bezier(.2,.8,.2,1),border-color .2s ease,background .2s ease,box-shadow .2s ease}
+.day-chip .rail-weekday{font-size:9px;letter-spacing:.105em}
+.day-chip .rail-day{margin-top:5px;font-size:22px;font-weight:710}
+.day-chip .rail-dot{width:4px;height:4px;margin-top:7px}
+.day-chip.selected{border-color:rgba(10,132,255,.48);background:linear-gradient(180deg,rgba(10,132,255,.13),rgba(10,132,255,.055));box-shadow:0 7px 20px rgba(10,132,255,.075)}
+.day-chip.selected .rail-dot{box-shadow:0 0 0 3px rgba(10,132,255,.11)}
+
+.hero-curve{height:138px;background:linear-gradient(180deg,rgba(10,132,255,.035),rgba(10,132,255,0) 92%)}
+.hero-curve svg{height:118px;overflow:visible}
+#heroCurvePath{filter:drop-shadow(0 2px 7px rgba(10,132,255,.12));stroke-dasharray:700;stroke-dashoffset:0}
+#heroCurveFillPath{opacity:.78;transition:opacity .32s ease}
+.hero-curve.animating #heroCurvePath{animation:drawTideCurve .85s cubic-bezier(.22,.61,.36,1) both}
+.hero-curve.animating #heroCurveFillPath{animation:fadeCurveFill .7s .16s ease both}
+.hero-curve.animating #heroCurveMarker,
+.hero-curve.animating #heroCurveMarkerHalo{animation:markerReveal .32s .62s ease both}
+@keyframes drawTideCurve{from{stroke-dashoffset:700}to{stroke-dashoffset:0}}
+@keyframes fadeCurveFill{from{opacity:0}to{opacity:.78}}
+@keyframes markerReveal{from{opacity:0;transform:scale(.55);transform-origin:center}to{opacity:1;transform:scale(1);transform-origin:center}}
+
+.curve-extrema{position:absolute;transform:translate(-50%,-50%);min-width:42px;text-align:center;pointer-events:none}
+.curve-extrema .curve-kind{display:block;color:rgba(245,245,247,.46);font-size:7px;font-weight:760;line-height:1;letter-spacing:.09em;text-transform:uppercase}
+.curve-extrema .curve-clock{display:block;margin-top:3px;color:rgba(245,245,247,.72);font-size:9px;font-weight:680;line-height:1;font-variant-numeric:tabular-nums}
+.curve-extrema .curve-height{display:block;margin-top:3px;color:rgba(245,245,247,.38);font-size:7px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+
+.day-change-flash .hero-card,.day-change-flash .events-grid,.day-change-flash .solar-card{animation:dayChange .28s cubic-bezier(.22,.61,.36,1) both}
+@keyframes dayChange{from{opacity:.52;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+}
+@media(prefers-color-scheme:dark){
+  .day-chip{background:rgba(28,28,30,.82)}
+}

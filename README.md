@@ -56,3 +56,8 @@ cp .dev.vars.example .dev.vars
 # Remplacer la valeur dans .dev.vars
 npm run dev
 ```
+
+
+## Version interface V4
+
+Cette version améliore uniquement l’interface : courbe animée avec repères PM/BM et hauteurs, frise de jours affinée, et transitions discrètes. L’API et le secret Cloudflare restent inchangés.
