@@ -65,6 +65,7 @@
             <circle id="heroCurveMarkerHalo" cx="0" cy="0" r="0" fill="#0a84ff" opacity="0.18"></circle>
             <circle id="heroCurveMarker" cx="0" cy="0" r="0" fill="#f5f5f7" stroke="#0a84ff" stroke-width="2"></circle>
           </svg>
+          <div id="heroCurveLabels" class="hero-curve-labels"></div>
         </div>
         <div class="next-event-row">
           <div>
@@ -90,32 +91,18 @@
           <div class="solar-row dawn"><span>Aube</span><strong id="dawn">—</strong></div>
           <div class="solar-row sunrise"><span>Lever</span><strong id="sunrise">—</strong></div>
           <div class="solar-row sunset"><span>Coucher</span><strong id="sunset">—</strong></div>
-          <div class="solar-row dusk">
-            <span class="solar-label">Dernières lueurs</span>
-            <span class="moon-mark" aria-hidden="true">
-              <svg viewBox="0 0 28 28" role="presentation">
-                <defs>
-                  <linearGradient id="moonSilver" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#f2f5fb" stop-opacity="0.92"/>
-                    <stop offset="100%" stop-color="#9ca8bc" stop-opacity="0.76"/>
-                  </linearGradient>
-                </defs>
-                <path d="M20.7 20.8A10.2 10.2 0 0 1 8.1 7.1a10.3 10.3 0 1 0 12.6 13.7Z" fill="url(#moonSilver)"/>
-              </svg>
-            </span>
-            <strong id="dusk">—</strong>
-          </div>
+          <div class="solar-row dusk"><span>Dernières lueurs</span><strong id="dusk">—</strong></div>
         </article>
       </section>
     </section>
 
-    <section id="weekView" class="view" aria-label="Sept jours">
-      <p id="weekHint" class="week-hint" hidden>Données de la semaine suivante en attente d’actualisation.</p>
+    <section id="weekView" class="view" aria-label="Quatorze jours">
+      <p id="weekHint" class="week-hint" hidden>Données des 14 jours suivants en attente d’actualisation.</p>
       <div id="weekList" class="week-list"></div>
     </section>
     <footer class="data-footer">
       <span id="dataStatus"></span>
-      <a href="https://api-maree.fr/" target="_blank" rel="noreferrer">api-maree.fr</a>
+      <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>
       <span>·</span>
       <a href="https://sunrisesunset.io/" target="_blank" rel="noreferrer">SunriseSunset.io</a>
     </footer>
@@ -126,7 +113,7 @@
       <span class="tab-icon">◉</span><span>Aujourd’hui</span>
     </button>
     <button class="tab" data-view="weekView">
-      <span class="tab-icon">▦</span><span>7 jours</span>
+      <span class="tab-icon">▦</span><span>14 jours</span>
     </button>
   </nav>
 

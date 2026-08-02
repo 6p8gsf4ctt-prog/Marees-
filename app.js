@@ -1,5 +1,7 @@
 const TZ = 'Europe/Paris';
 const SOLAR_API = 'https://api.sunrisesunset.io/json';
+const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine';
+const CACHE_KEY = 'marees-tarnos-v3-data';
 const LAT = 43.541;
 const LNG = -1.462;
 let tideData;
@@ -65,6 +67,59 @@ async function loadMissingSolar() {
     day.solar = {dawn:cleanTime(item.dawn),sunrise:cleanTime(item.sunrise),sunset:cleanTime(item.sunset),dusk:cleanTime(item.dusk)};
     writeSolarCache(day.date,day.solar);
   });
+}
+
+function cacheData(data) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({savedAt:Date.now(),data})); } catch {} }
+function readCachedData() { try { const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return cached?.data?.days?.length?cached.data:null; } catch { return null; } }
+function localDateTimeParts(iso) { const [date,time='00:00']=String(iso).split('T'); return {date,time:time.slice(0,5)}; }
+function parabolicExtremum(prev,current,next) {
+  const y1=prev.value,y2=current.value,y3=next.value;
+  const denominator=y1-2*y2+y3;
+  const offset=Math.abs(denominator)<1e-9?0:Math.max(-.5,Math.min(.5,.5*(y1-y3)/denominator));
+  return {timestamp:current.timestamp+offset*3600000,value:y2-.25*(y1-y3)*offset};
+}
+function extractExtrema(samples) {
+  const extrema=[];
+  for(let i=1;i<samples.length-1;i+=1){
+    const a=samples[i-1],b=samples[i],c=samples[i+1];
+    const high=b.value>=a.value&&b.value>c.value;
+    const low=b.value<=a.value&&b.value<c.value;
+    if(!high&&!low) continue;
+    const refined=parabolicExtremum(a,b,c), dateObj=new Date(refined.timestamp);
+    extrema.push({type:high?'high':'low',date:localDateKey(dateObj),time:frDate(dateObj,{hour:'2-digit',minute:'2-digit'}),height:refined.value});
+  }
+  return extrema;
+}
+function normalizeDisplayHeights(extrema) {
+  const lows=extrema.filter(e=>e.type==='low').map(e=>e.height);
+  if(!lows.length) return extrema;
+  const offset=.45-Math.min(...lows);
+  return extrema.map(e=>({...e,height:e.height+offset}));
+}
+function buildDaysFromMarine(payload) {
+  const times=payload?.hourly?.time||[], values=payload?.hourly?.sea_level_height_msl||[];
+  if(!times.length||times.length!==values.length) throw new Error('Données marines incomplètes');
+  const samples=times.map((iso,index)=>({timestamp:new Date(iso).getTime(),value:Number(values[index])})).filter(s=>Number.isFinite(s.value));
+  const extrema=normalizeDisplayHeights(extractExtrema(samples)), byDate=new Map();
+  extrema.forEach(event=>{ if(!byDate.has(event.date)) byDate.set(event.date,[]); byDate.get(event.date).push({type:event.type,time:event.time,height:Number(event.height.toFixed(2))}); });
+  const dates=[...new Set(times.map(t=>localDateTimeParts(t).date))].slice(0,14);
+  const days=dates.map(date=>({date,events:(byDate.get(date)||[]).sort((a,b)=>a.time.localeCompare(b.time))})).filter(day=>day.events.length>=2);
+  return {location:'Tarnos',reference_port:'Modèle marin Open-Meteo',timezone:TZ,updated_at:new Date().toISOString(),source:'Open-Meteo Marine API',days};
+}
+async function fetchMarineData() {
+  let lastError;
+  for(const forecastDays of [16,14,10,8]){
+    const params=new URLSearchParams({latitude:String(LAT),longitude:String(LNG),hourly:'sea_level_height_msl',timezone:TZ,forecast_days:String(forecastDays),cell_selection:'sea'});
+    try {
+      const response=await fetch(`${MARINE_API}?${params}`,{cache:'no-store'});
+      if(!response.ok) throw new Error(`Marine HTTP ${response.status}`);
+      const data=buildDaysFromMarine(await response.json());
+      if(data.days.length<2) throw new Error('Prévisions marines insuffisantes');
+      cacheData(data); return data;
+    } catch(error) { lastError=error; }
+  }
+  const cached=readCachedData(); if(cached) return cached;
+  throw lastError||new Error('Données marines indisponibles');
 }
 
 function todayIndex(now = new Date()) {
@@ -210,7 +265,7 @@ function renderHeroCurve(day, now = new Date()) {
   const svgWidth = 320;
   const svgHeight = 112;
   const points = curvePointsForDay(selectedDayIndex);
-  const { line, fill } = curvePath(points, svgWidth, svgHeight);
+  const { line, fill, mapped } = curvePath(points, svgWidth, svgHeight);
   $('heroCurvePath').setAttribute('d', line || '');
   $('heroCurveFillPath').setAttribute('d', fill || '');
 
@@ -224,7 +279,18 @@ function renderHeroCurve(day, now = new Date()) {
   $('heroCurveMarkerHalo').setAttribute('cx', marker.x.toFixed(2));
   $('heroCurveMarkerHalo').setAttribute('cy', marker.y.toFixed(2));
   $('heroCurveMarkerHalo').setAttribute('r', isToday ? '12' : '9');
+
+  const innerMapped = mapped.slice(1, 1 + day.events.length);
+  $('heroCurveLabels').innerHTML = day.events.map((event, index) => {
+    const point = innerMapped[index];
+    if (!point) return '';
+    const left = Math.min(94, Math.max(6, (point.x / svgWidth) * 100));
+    const rawTop = (point.y / svgHeight) * 112;
+    const top = event.type === 'high' ? Math.max(8, rawTop - 13) : Math.min(105, rawTop + 13);
+    return `<span class="curve-time-label" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px">${event.time}</span>`;
+  }).join('');
 }
+
 function eventCard(e,dateKey) {
   return `<article class="card event-card"><div class="event-date">${shortEventDate(dateKey)}</div><div class="event-time">${e.time}</div><div class="event-type">${eventName(e.type)}</div><div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div></article>`;
 }
@@ -272,8 +338,8 @@ function updateLive(now=new Date()) {
   renderHeroCurve(selectedDay(), now);
 }
 
-function weekCount() { return Math.max(1, Math.ceil(tideData.days.length / 7)); }
-function weekSlice(index=selectedWeekIndex) { return tideData.days.slice(index * 7, index * 7 + 7); }
+function weekCount() { return Math.max(1, Math.ceil(tideData.days.length / 14)); }
+function weekSlice(index=selectedWeekIndex) { return tideData.days.slice(index * 14, index * 14 + 14); }
 function renderWeek() {
   const days=weekSlice();
   $('weekList').innerHTML=days.map(day=>{
@@ -283,16 +349,16 @@ function renderWeek() {
     return `<article class="card day-card"><div class="day-heading"><strong>${name[0].toUpperCase()+name.slice(1)}</strong><span>${shortDate}</span></div><div class="day-events">${events}</div></article>`;
   }).join('');
   const first=days[0],last=days.at(-1);
-  $('pageTitle').textContent='7 jours';
+  $('pageTitle').textContent='14 jours';
   $('fullDate').textContent=first&&last?`${frDate(eventDate(first.date,'12:00'),{day:'numeric',month:'short'})} – ${frDate(eventDate(last.date,'12:00'),{day:'numeric',month:'short'})}`:'';
   const totalWeeks = weekCount();
   $('previousDay').disabled = selectedWeekIndex === 0;
   $('nextDay').disabled = selectedWeekIndex >= totalWeeks - 1;
-  $('previousDay').setAttribute('aria-label', 'Semaine précédente');
-  $('nextDay').setAttribute('aria-label', 'Semaine suivante');
+  $('previousDay').setAttribute('aria-label', '14 jours précédents');
+  $('nextDay').setAttribute('aria-label', '14 jours suivants');
   $('weekHint').hidden = totalWeeks > 1;
-  $('todayButton').hidden=selectedWeekIndex===Math.floor(todayIndex()/7);
-  $('todayButton').textContent='Semaine actuelle';
+  $('todayButton').hidden=selectedWeekIndex===Math.floor(todayIndex()/14);
+  $('todayButton').textContent='Période actuelle';
 }
 function bindNavigation() {
   $('previousDay').addEventListener('click',()=>{
@@ -307,7 +373,7 @@ function bindNavigation() {
   });
   $('todayButton').addEventListener('click',()=>{
     if(activeView==='todayView'){selectedDayIndex=todayIndex();renderSelectedDay();scrollSelectedDayIntoView();}
-    else {selectedWeekIndex=Math.floor(todayIndex()/7);renderWeek();}
+    else {selectedWeekIndex=Math.floor(todayIndex()/14);renderWeek();}
     window.scrollTo({top:0,behavior:'smooth'});
   });
 }
@@ -327,18 +393,16 @@ function bindTabs() {
       $('nextDay').setAttribute('aria-label','Jour suivant');
       renderSelectedDay();
     } else {
-      selectedWeekIndex=Math.floor(todayIndex()/7);
+      selectedWeekIndex=Math.floor(todayIndex()/14);
       renderWeek();
     }
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
 async function init() {
-  const response=await fetch(`data/tides.json?v=${Date.now()}`,{cache:'no-store'});
-  if(!response.ok) throw new Error('Données indisponibles');
-  tideData=await response.json();
+  tideData=await fetchMarineData();
   if(!Array.isArray(tideData.days)||!tideData.days.length) throw new Error('Données indisponibles');
-  selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/7);
+  selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/14);
   renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation(); scrollSelectedDayIntoView();
   loadMissingSolar().then(()=>renderSolar(selectedDay())).catch(error=>console.warn(error));
   setInterval(()=>updateLive(new Date()),30000);
