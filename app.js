@@ -3,6 +3,7 @@ const SOLAR_API = 'https://api.sunrisesunset.io/json';
 const LAT = 43.541;
 const LNG = -1.462;
 let tideData;
+let selectedDayIndex = 0;
 
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, '0');
@@ -20,6 +21,10 @@ function eventDate(dateKey, time) {
 }
 function formatHeight(v) { return `${Number(v).toFixed(2).replace('.', ',')} m`; }
 function eventName(type) { return type === 'high' ? 'Pleine mer' : 'Basse mer'; }
+function shortEventDate(dateKey) {
+  const date = eventDate(dateKey, '12:00');
+  return frDate(date, { weekday:'short', day:'numeric', month:'short' }).replace(/\.$/, '');
+}
 function shortType(type) { return type === 'high' ? 'PM' : 'BM'; }
 function cleanTime(value) {
   if (!value) return '—';
@@ -81,10 +86,12 @@ async function loadMissingSolar() {
   });
 }
 
-function getTodayRecord(now = new Date()) {
+function todayIndex(now = new Date()) {
   const key = localDateKey(now);
-  return tideData.days.find(d => d.date === key) || tideData.days[0];
+  const index = tideData.days.findIndex(d => d.date === key);
+  return index >= 0 ? index : 0;
 }
+function selectedDay() { return tideData.days[selectedDayIndex] || tideData.days[0]; }
 function allEvents() {
   return tideData.days.flatMap(day => day.events.map(event => ({...event, date:day.date, at:eventDate(day.date,event.time)})));
 }
@@ -92,47 +99,58 @@ function nextAndPrevious(now) {
   const events = allEvents().sort((a,b) => a.at-b.at);
   let nextIndex = events.findIndex(e => e.at > now);
   if (nextIndex < 0) nextIndex = events.length - 1;
-  return { next: events[nextIndex], previous: events[Math.max(0,nextIndex-1)] };
+  return { next:events[nextIndex], previous:events[Math.max(0,nextIndex-1)] };
 }
 function countdownText(ms) {
   if (ms <= 0) return 'Maintenant';
-  const minutes = Math.floor(ms/60000);
-  const h = Math.floor(minutes/60), m = minutes%60;
+  const minutes = Math.floor(ms/60000), h = Math.floor(minutes/60), m = minutes%60;
   return h ? `${h} h ${pad(m)}` : `${m} min`;
 }
 function renderSolar(day) {
   const solar = day.solar || {};
-  $('dawn').textContent = cleanTime(solar.dawn);
-  $('sunrise').textContent = cleanTime(solar.sunrise);
-  $('sunset').textContent = cleanTime(solar.sunset);
-  $('dusk').textContent = cleanTime(solar.dusk);
+  $('dawn').textContent = cleanTime(solar.dawn); $('sunrise').textContent = cleanTime(solar.sunrise);
+  $('sunset').textContent = cleanTime(solar.sunset); $('dusk').textContent = cleanTime(solar.dusk);
 }
-function eventCard(e) {
-  return `<article class="card event-card">
-    <div class="event-time">${e.time}</div>
-    <div class="event-type">${eventName(e.type)}</div>
-    <div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div>
-  </article>`;
+function eventCard(e,dateKey) {
+  return `<article class="card event-card"><div class="event-date">${shortEventDate(dateKey)}</div><div class="event-time">${e.time}</div><div class="event-type">${eventName(e.type)}</div><div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div></article>`;
 }
-function renderToday(now = new Date()) {
-  const day = getTodayRecord(now);
-  const shownDate = eventDate(day.date, '12:00');
-  $('fullDate').textContent = frDate(shownDate, { weekday:'long', day:'numeric', month:'long' });
-  $('todayEvents').innerHTML = day.events.map(eventCard).join('');
+function renderSelectedDay(now = new Date()) {
+  const day = selectedDay();
+  const shownDate = eventDate(day.date,'12:00');
+  const isToday = day.date === localDateKey(now);
+  $('pageTitle').textContent = isToday ? 'Aujourd’hui' : frDate(shownDate,{weekday:'long'}).replace(/^./,c=>c.toUpperCase());
+  $('fullDate').textContent = frDate(shownDate,{weekday:'long',day:'numeric',month:'long'});
+  $('todayEvents').innerHTML = day.events.map(e => eventCard(e,day.date)).join('');
   renderSolar(day);
-  updateLive(now);
+  $('previousDay').disabled = selectedDayIndex === 0;
+  $('nextDay').disabled = selectedDayIndex === tideData.days.length - 1;
+  $('todayButton').hidden = isToday;
+  if (isToday) updateLive(now); else renderForecastHero(day);
+}
+function renderForecastHero(day) {
+  const first = day.events[0];
+  $('tideDirection').textContent = 'Prévisions';
+  $('currentTime').textContent = shortEventDate(day.date);
+  $('nextLabel').textContent = 'PREMIÈRE MARÉE';
+  $('countdown').textContent = frDate(eventDate(day.date,'12:00'),{day:'numeric',month:'short'}).replace('.','');
+  $('nextDate').textContent = shortEventDate(day.date); $('nextTime').textContent = first.time;
+  $('nextType').textContent = eventName(first.type); $('nextHeight').textContent = formatHeight(first.height);
+  $('nextCoeff').textContent = first.coefficient ? `Coefficient ${first.coefficient}` : '';
 }
 function updateLive(now = new Date()) {
-  const {next, previous} = nextAndPrevious(now);
+  if (selectedDay().date !== localDateKey(now)) return;
+  const {next,previous} = nextAndPrevious(now);
   const rising = previous.type === 'low' && next.type === 'high';
   $('tideDirection').textContent = rising ? 'Marée montante' : 'Marée descendante';
-  $('currentTime').textContent = frDate(now, {hour:'2-digit', minute:'2-digit'});
-  $('nextLabel').textContent = `${eventName(next.type).toUpperCase()} DANS`;
-  $('countdown').textContent = countdownText(next.at-now);
-  $('nextTime').textContent = next.time;
-  $('nextType').textContent = eventName(next.type);
-  $('nextHeight').textContent = formatHeight(next.height);
-  $('nextCoeff').textContent = next.coefficient ? `Coefficient ${next.coefficient}` : '';
+  $('currentTime').textContent = frDate(now,{hour:'2-digit',minute:'2-digit'});
+  $('nextLabel').textContent = `${eventName(next.type).toUpperCase()} DANS`; $('countdown').textContent = countdownText(next.at-now);
+  $('nextDate').textContent = shortEventDate(next.date); $('nextTime').textContent = next.time; $('nextType').textContent = eventName(next.type);
+  $('nextHeight').textContent = formatHeight(next.height); $('nextCoeff').textContent = next.coefficient ? `Coefficient ${next.coefficient}` : '';
+}
+function bindDayNavigation() {
+  $('previousDay').addEventListener('click',()=>{ if(selectedDayIndex>0){selectedDayIndex--;renderSelectedDay();window.scrollTo({top:0,behavior:'smooth'});} });
+  $('nextDay').addEventListener('click',()=>{ if(selectedDayIndex<tideData.days.length-1){selectedDayIndex++;renderSelectedDay();window.scrollTo({top:0,behavior:'smooth'});} });
+  $('todayButton').addEventListener('click',()=>{selectedDayIndex=todayIndex();renderSelectedDay();window.scrollTo({top:0,behavior:'smooth'});});
 }
 function renderWeek() {
   $('weekList').innerHTML = tideData.days.slice(0, 7).map(day => {
@@ -155,7 +173,9 @@ function bindTabs() {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     tab.classList.add('active'); tab.setAttribute('aria-current','page');
     $(tab.dataset.view).classList.add('active');
-    $('pageTitle').textContent = tab.dataset.view === 'todayView' ? 'Aujourd’hui' : '7 jours';
+    if (tab.dataset.view === 'todayView') renderSelectedDay(); else $('pageTitle').textContent = '7 jours';
+    document.querySelector('.day-nav').hidden = tab.dataset.view !== 'todayView';
+    $('todayButton').hidden = tab.dataset.view !== 'todayView' || selectedDay().date === localDateKey();
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
@@ -164,8 +184,8 @@ async function init() {
   if (!response.ok) throw new Error('Données indisponibles');
   tideData = await response.json();
   if (!Array.isArray(tideData.days) || !tideData.days.length) throw new Error('Données indisponibles');
-  renderToday(); renderWeek(); renderDataStatus(); bindTabs();
-  loadMissingSolar().then(() => renderSolar(getTodayRecord())).catch(error => console.warn(error));
+  selectedDayIndex = todayIndex(); renderSelectedDay(); renderWeek(); renderDataStatus(); bindTabs(); bindDayNavigation();
+  loadMissingSolar().then(() => renderSolar(selectedDay())).catch(error => console.warn(error));
   setInterval(() => updateLive(new Date()), 30000);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
 }

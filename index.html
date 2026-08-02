@@ -17,12 +17,21 @@
   <main class="app-shell">
     <header class="page-header">
       <p class="eyebrow">TARNOS</p>
-      <h1 id="pageTitle">Aujourd’hui</h1>
-      <p id="fullDate" class="date-line"></p>
+      <div class="title-row">
+        <div>
+          <h1 id="pageTitle">Aujourd’hui</h1>
+          <p id="fullDate" class="date-line"></p>
+        </div>
+        <div class="day-nav" aria-label="Changer de jour">
+          <button id="previousDay" class="day-arrow" type="button" aria-label="Jour précédent">‹</button>
+          <button id="nextDay" class="day-arrow" type="button" aria-label="Jour suivant">›</button>
+        </div>
+      </div>
+      <button id="todayButton" class="today-button" type="button" hidden>Aujourd’hui</button>
     </header>
 
     <section id="todayView" class="view active" aria-label="Aujourd’hui">
-      <article class="hero-card card">
+      <article class="hero-card card ocean-card">
         <div class="hero-topline">
           <span id="tideDirection" class="status-pill">—</span>
           <span id="currentTime" class="current-time">—</span>
@@ -31,6 +40,7 @@
         <div id="countdown" class="countdown">—</div>
         <div class="next-event-row">
           <div>
+            <div id="nextDate" class="event-date hero-event-date">—</div>
             <div id="nextTime" class="event-time large">—</div>
             <div id="nextType" class="event-type">—</div>
           </div>
@@ -48,7 +58,7 @@
 
       <section class="section-block">
         <h2>Soleil</h2>
-        <article class="card solar-card">
+        <article class="card solar-card sun-card">
           <div class="solar-row"><span>Aube</span><strong id="dawn">—</strong></div>
           <div class="solar-row"><span>Lever</span><strong id="sunrise">—</strong></div>
           <div class="solar-row"><span>Coucher</span><strong id="sunset">—</strong></div>

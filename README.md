@@ -51,3 +51,7 @@ L’application conserve la dernière version téléchargée des données. En ca
 ## Correction 2.1 — Soleil
 
 Les heures solaires sont désormais chargées directement par l’application lorsqu’elles ne sont pas encore présentes dans `data/tides.json`. Elles sont ensuite conservées localement. Cette récupération ne nécessite aucune clé.
+
+## Amélioration 2.2 — Date des marées
+
+Chaque horaire de marée affiche désormais une date courte discrète, y compris la prochaine marée mise en avant. Cela évite toute ambiguïté pour les événements proches de minuit.
