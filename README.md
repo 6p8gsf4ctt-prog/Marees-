@@ -55,3 +55,12 @@ Les heures solaires sont désormais chargées directement par l’application lo
 ## Amélioration 2.2 — Date des marées
 
 Chaque horaire de marée affiche désormais une date courte discrète, y compris la prochaine marée mise en avant. Cela évite toute ambiguïté pour les événements proches de minuit.
+
+## Version 2.5
+
+- Retour à une présentation solaire sobre : halo solaire fondu au lever et lune fondue au coucher.
+- Ajout d’une fine bande bleue sous la carte Soleil.
+- Navigation de l’écran « 7 jours » par semaines complètes.
+- Les flèches de semaine deviennent actives dès que l’action GitHub a généré les 28 jours de données.
+
+Après avoir publié cette version, lancer manuellement **Actions → Actualiser les marées → Run workflow** une fois afin de générer les quatre semaines disponibles.

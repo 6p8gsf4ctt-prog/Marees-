@@ -136,8 +136,8 @@ function updateLive(now=new Date()) {
   $('nextHeight').textContent=formatHeight(next.height); $('nextCoeff').textContent=next.coefficient?`Coefficient ${next.coefficient}`:'';
 }
 
-function weekCount() { return Math.ceil(tideData.days.length/7); }
-function weekSlice(index=selectedWeekIndex) { return tideData.days.slice(index*7,index*7+7); }
+function weekCount() { return Math.max(1, Math.ceil(tideData.days.length / 7)); }
+function weekSlice(index=selectedWeekIndex) { return tideData.days.slice(index * 7, index * 7 + 7); }
 function renderWeek() {
   const days=weekSlice();
   $('weekList').innerHTML=days.map(day=>{
@@ -149,8 +149,12 @@ function renderWeek() {
   const first=days[0],last=days.at(-1);
   $('pageTitle').textContent='7 jours';
   $('fullDate').textContent=first&&last?`${frDate(eventDate(first.date,'12:00'),{day:'numeric',month:'short'})} – ${frDate(eventDate(last.date,'12:00'),{day:'numeric',month:'short'})}`:'';
-  $('previousDay').disabled=selectedWeekIndex===0;
-  $('nextDay').disabled=selectedWeekIndex>=weekCount()-1;
+  const totalWeeks = weekCount();
+  $('previousDay').disabled = selectedWeekIndex === 0;
+  $('nextDay').disabled = selectedWeekIndex >= totalWeeks - 1;
+  $('previousDay').setAttribute('aria-label', 'Semaine précédente');
+  $('nextDay').setAttribute('aria-label', 'Semaine suivante');
+  $('weekHint').hidden = totalWeeks > 1;
   $('todayButton').hidden=selectedWeekIndex===Math.floor(todayIndex()/7);
   $('todayButton').textContent='Semaine actuelle';
 }
@@ -181,7 +185,14 @@ function bindTabs() {
     document.querySelectorAll('.tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     tab.classList.add('active');tab.setAttribute('aria-current','page');$(activeView).classList.add('active');
-    if(activeView==='todayView') renderSelectedDay(); else {selectedWeekIndex=Math.floor(todayIndex()/7);renderWeek();}
+    if(activeView==='todayView') {
+      $('previousDay').setAttribute('aria-label','Jour précédent');
+      $('nextDay').setAttribute('aria-label','Jour suivant');
+      renderSelectedDay();
+    } else {
+      selectedWeekIndex=Math.floor(todayIndex()/7);
+      renderWeek();
+    }
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
