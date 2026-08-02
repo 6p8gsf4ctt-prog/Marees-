@@ -10,6 +10,7 @@ import unicodedata
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 API_BASE = "https://api-maree.fr"
 SUN_API = "https://api.sunrisesunset.io/json"
@@ -56,8 +57,8 @@ def main() -> int:
         print("La variable API_MAREE_KEY est absente.", file=sys.stderr)
         return 2
 
-    today = dt.date.today()
-    end = today + dt.timedelta(days=7)
+    today = dt.datetime.now(ZoneInfo(TZ)).date()
+    end = today + dt.timedelta(days=27)
     start_s = today.isoformat()
     end_s = end.isoformat()
     site_id, site_name = resolve_site_id(api_key)
