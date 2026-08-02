@@ -1,4 +1,10 @@
-# Marées Tarnos — version connectée
+# Marées Tarnos — V2.7
+
+Cette version conserve intégralement la page d’accueil de la V2.6 et ajoute une frise horizontale permettant de choisir rapidement un jour. L’onglet « 7 jours » reste disponible.
+
+# Marées Tarnos — V2.6
+
+— version connectée
 
 Application PWA personnelle, conçue pour l’iPhone en mode portrait.
 

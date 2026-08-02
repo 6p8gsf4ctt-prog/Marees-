@@ -75,6 +75,34 @@ function todayIndex(now = new Date()) {
   return future >= 0 ? future : Math.max(0,tideData.days.length-1);
 }
 function selectedDay() { return tideData.days[selectedDayIndex] || tideData.days[0]; }
+function renderDayRail() {
+  const rail = $('dayRail');
+  if (!rail) return;
+  const todayKey = localDateKey();
+  rail.innerHTML = tideData.days.map((day,index) => {
+    const date = eventDate(day.date,'12:00');
+    const weekday = frDate(date,{weekday:'short'}).replace('.','');
+    const dayNumber = frDate(date,{day:'numeric'});
+    const classes = ['day-chip'];
+    if (day.date === todayKey) classes.push('current');
+    if (index === selectedDayIndex) classes.push('selected');
+    return `<button class="${classes.join(' ')}" type="button" role="listitem" data-day-index="${index}" aria-label="${frDate(date,{weekday:'long',day:'numeric',month:'long'})}" ${index===selectedDayIndex?'aria-current="date"':''}><span class="rail-weekday">${weekday}</span><span class="rail-day">${dayNumber}</span><span class="rail-dot"></span></button>`;
+  }).join('');
+  const first=tideData.days[0],last=tideData.days.at(-1);
+  if ($('dayRailRange') && first && last) $('dayRailRange').textContent=`${frDate(eventDate(first.date,'12:00'),{day:'numeric',month:'short'})} – ${frDate(eventDate(last.date,'12:00'),{day:'numeric',month:'short'})}`;
+  rail.querySelectorAll('.day-chip').forEach(button => button.addEventListener('click', () => {
+    selectedDayIndex = Number(button.dataset.dayIndex);
+    renderSelectedDay();
+    scrollSelectedDayIntoView();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }));
+}
+function scrollSelectedDayIntoView() {
+  requestAnimationFrame(() => {
+    const selected = $('dayRail')?.querySelector('.day-chip.selected');
+    selected?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  });
+}
 function allEvents() { return tideData.days.flatMap(day => day.events.map(event => ({...event,date:day.date,at:eventDate(day.date,event.time)}))); }
 function nextAndPrevious(now) {
   const events = allEvents().sort((a,b)=>a.at-b.at);
@@ -216,6 +244,7 @@ function renderSelectedDay(now=new Date()) {
   renderHeroCurve(day, now);
   $('previousDay').disabled=selectedDayIndex===0;
   $('nextDay').disabled=selectedDayIndex===tideData.days.length-1;
+  renderDayRail();
   if (day.date===localDateKey(now)) updateLive(now); else renderForecastHero(day);
 }
 function renderForecastHero(day) {
@@ -267,17 +296,17 @@ function renderWeek() {
 }
 function bindNavigation() {
   $('previousDay').addEventListener('click',()=>{
-    if(activeView==='todayView'&&selectedDayIndex>0){selectedDayIndex--;renderSelectedDay();}
+    if(activeView==='todayView'&&selectedDayIndex>0){selectedDayIndex--;renderSelectedDay();scrollSelectedDayIntoView();}
     else if(activeView==='weekView'&&selectedWeekIndex>0){selectedWeekIndex--;renderWeek();}
     window.scrollTo({top:0,behavior:'smooth'});
   });
   $('nextDay').addEventListener('click',()=>{
-    if(activeView==='todayView'&&selectedDayIndex<tideData.days.length-1){selectedDayIndex++;renderSelectedDay();}
+    if(activeView==='todayView'&&selectedDayIndex<tideData.days.length-1){selectedDayIndex++;renderSelectedDay();scrollSelectedDayIntoView();}
     else if(activeView==='weekView'&&selectedWeekIndex<weekCount()-1){selectedWeekIndex++;renderWeek();}
     window.scrollTo({top:0,behavior:'smooth'});
   });
   $('todayButton').addEventListener('click',()=>{
-    if(activeView==='todayView'){selectedDayIndex=todayIndex();renderSelectedDay();}
+    if(activeView==='todayView'){selectedDayIndex=todayIndex();renderSelectedDay();scrollSelectedDayIntoView();}
     else {selectedWeekIndex=Math.floor(todayIndex()/7);renderWeek();}
     window.scrollTo({top:0,behavior:'smooth'});
   });
@@ -292,6 +321,7 @@ function bindTabs() {
     document.querySelectorAll('.tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     tab.classList.add('active');tab.setAttribute('aria-current','page');$(activeView).classList.add('active');
+    $('dayRailSection').hidden = activeView !== 'todayView';
     if(activeView==='todayView') {
       $('previousDay').setAttribute('aria-label','Jour précédent');
       $('nextDay').setAttribute('aria-label','Jour suivant');
@@ -309,7 +339,7 @@ async function init() {
   tideData=await response.json();
   if(!Array.isArray(tideData.days)||!tideData.days.length) throw new Error('Données indisponibles');
   selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/7);
-  renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation();
+  renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation(); scrollSelectedDayIntoView();
   loadMissingSolar().then(()=>renderSolar(selectedDay())).catch(error=>console.warn(error));
   setInterval(()=>updateLive(new Date()),30000);
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
