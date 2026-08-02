@@ -1,4 +1,6 @@
-# Marées Tarnos — application + API
+# Marées Tarnos — V4.1
+
+Correction graphique : les libellés PM/BM, horaires et hauteurs sont maintenant placés dans des zones réservées au-dessus des sommets et sous les creux de la courbe.
 
 Ce dépôt contient une application complète hébergée par **Cloudflare Workers Static Assets** et une API privée exécutée dans le même Worker.
 

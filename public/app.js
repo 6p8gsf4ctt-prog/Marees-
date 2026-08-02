@@ -162,12 +162,12 @@ function curvePointsForDay(dayIndex) {
   const inner = current.events.map(event => ({minutes: minutesOf(event.time), height: event.height}));
   return [boundaryPoint(neighborEvents, 0), ...inner, boundaryPoint(neighborEvents, 1440)].sort((a,b) => a.minutes - b.minutes);
 }
-function curvePath(points, width, height, bottomPadding = 10) {
+function curvePath(points, width, height, bottomPadding = 30) {
   const heights = points.map(point => point.height);
   const min = Math.min(...heights);
   const max = Math.max(...heights);
   const spread = Math.max(0.35, max - min);
-  const topPad = 12;
+  const topPad = 40;
   const usableHeight = height - topPad - bottomPadding;
   const normalized = points.map(point => ({
     x: (point.minutes / 1440) * width,
@@ -195,8 +195,8 @@ function pointOnCurve(points, targetMinutes, width, height) {
   const min = Math.min(...heights);
   const max = Math.max(...heights);
   const spread = Math.max(0.35, max - min);
-  const topPad = 12;
-  const bottomPad = 10;
+  const topPad = 40;
+  const bottomPad = 30;
   const usableHeight = height - topPad - bottomPad;
   const before = [...points].reverse().find(point => point.minutes <= targetMinutes) || points[0];
   const after = points.find(point => point.minutes >= targetMinutes) || points[points.length - 1];
@@ -208,7 +208,7 @@ function pointOnCurve(points, targetMinutes, width, height) {
 }
 function renderHeroCurve(day, now = new Date(), animate = true) {
   const svgWidth = 320;
-  const svgHeight = 112;
+  const svgHeight = 132;
   const points = curvePointsForDay(selectedDayIndex);
   const { line, fill, mapped } = curvePath(points, svgWidth, svgHeight);
   $('heroCurvePath').setAttribute('d', line || '');
@@ -230,9 +230,9 @@ function renderHeroCurve(day, now = new Date(), animate = true) {
     const point = innerMapped[index];
     if (!point) return '';
     const left = Math.min(94, Math.max(6, (point.x / svgWidth) * 100));
-    const rawTop = (point.y / svgHeight) * 118;
-    const top = event.type === 'high' ? Math.max(13, rawTop - 19) : Math.min(117, rawTop + 20);
-    return `<span class="curve-extrema" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px"><span class="curve-kind">${event.type === 'high' ? 'PM' : 'BM'}</span><span class="curve-clock">${event.time}</span><span class="curve-height">${formatHeight(event.height)}</span></span>`;
+    const isHigh = event.type === 'high';
+    const top = isHigh ? point.y - 7 : point.y + 8;
+    return `<span class="curve-extrema ${isHigh ? 'is-high' : 'is-low'}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px"><span class="curve-kind">${isHigh ? 'PM' : 'BM'}</span><span class="curve-clock">${event.time}</span><span class="curve-height">${formatHeight(event.height)}</span></span>`;
   }).join('');
 
   const curve = $('heroCurve')?.closest('.hero-curve');

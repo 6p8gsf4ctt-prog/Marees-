@@ -56,8 +56,8 @@ body.app-ready .data-footer{animation-delay:.19s}
 .day-chip.selected{border-color:rgba(10,132,255,.48);background:linear-gradient(180deg,rgba(10,132,255,.13),rgba(10,132,255,.055));box-shadow:0 7px 20px rgba(10,132,255,.075)}
 .day-chip.selected .rail-dot{box-shadow:0 0 0 3px rgba(10,132,255,.11)}
 
-.hero-curve{height:138px;background:linear-gradient(180deg,rgba(10,132,255,.035),rgba(10,132,255,0) 92%)}
-.hero-curve svg{height:118px;overflow:visible}
+.hero-curve{height:158px;background:linear-gradient(180deg,rgba(10,132,255,.035),rgba(10,132,255,0) 92%)}
+.hero-curve svg{height:132px;overflow:visible}
 #heroCurvePath{filter:drop-shadow(0 2px 7px rgba(10,132,255,.12));stroke-dasharray:700;stroke-dashoffset:0}
 #heroCurveFillPath{opacity:.78;transition:opacity .32s ease}
 .hero-curve.animating #heroCurvePath{animation:drawTideCurve .85s cubic-bezier(.22,.61,.36,1) both}
@@ -68,7 +68,7 @@ body.app-ready .data-footer{animation-delay:.19s}
 @keyframes fadeCurveFill{from{opacity:0}to{opacity:.78}}
 @keyframes markerReveal{from{opacity:0;transform:scale(.55);transform-origin:center}to{opacity:1;transform:scale(1);transform-origin:center}}
 
-.curve-extrema{position:absolute;transform:translate(-50%,-50%);min-width:42px;text-align:center;pointer-events:none}
+.curve-extrema{position:absolute;min-width:48px;text-align:center;pointer-events:none}.curve-extrema.is-high{transform:translate(-50%,-100%)}.curve-extrema.is-low{transform:translate(-50%,0)}
 .curve-extrema .curve-kind{display:block;color:rgba(245,245,247,.46);font-size:7px;font-weight:760;line-height:1;letter-spacing:.09em;text-transform:uppercase}
 .curve-extrema .curve-clock{display:block;margin-top:3px;color:rgba(245,245,247,.72);font-size:9px;font-weight:680;line-height:1;font-variant-numeric:tabular-nums}
 .curve-extrema .curve-height{display:block;margin-top:3px;color:rgba(245,245,247,.38);font-size:7px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
