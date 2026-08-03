@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "marees-tarnos",
+  "name": "marees",
   "main": "src/index.js",
   "compatibility_date": "2026-08-02",
   "assets": {
