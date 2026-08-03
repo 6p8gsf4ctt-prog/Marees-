@@ -6,6 +6,22 @@ let tideData;
 let selectedDayIndex = 0;
 let selectedWeekIndex = 0;
 let activeView = 'todayView';
+let pendingImport = null;
+let isRefreshing = false;
+
+const APP_VERSION = '4.2.0';
+const STORAGE = {
+  preferences: 'marees-preferences-v1',
+  previousPreferences: 'marees-preferences-previous-v1',
+  lastPayload: 'marees-last-valid-payload-v1',
+  lastBackup: 'marees-last-manual-backup-v1',
+};
+const defaultPreferences = {
+  timeFormat24: true,
+  showSolar: true,
+  animations: true,
+};
+let preferences = loadPreferences();
 
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, '0');
@@ -22,6 +38,29 @@ function eventDate(dateKey, time) {
   return new Date(y, m - 1, d, hh, mm, 0, 0);
 }
 function formatHeight(v) { return `${Number(v).toFixed(2).replace('.', ',')} m`; }
+function displayTime(value) {
+  const normalized = cleanTime(value);
+  if (normalized === '—' || preferences.timeFormat24) return normalized;
+  const [hourText, minute] = normalized.split(':');
+  const hour = Number(hourText);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute} ${suffix}`;
+}
+function safeJsonParse(value, fallback = null) { try { return JSON.parse(value); } catch { return fallback; } }
+function storageGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function storageSet(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
+function loadPreferences() {
+  const stored = safeJsonParse(storageGet(STORAGE.preferences), {});
+  return { ...defaultPreferences, ...(stored && typeof stored === 'object' ? stored : {}) };
+}
+function savePreferences(next, { markModified = true } = {}) {
+  preferences = { ...defaultPreferences, ...next };
+  storageSet(STORAGE.preferences, JSON.stringify(preferences));
+  if (markModified) storageSet('marees-last-preference-change-v1', new Date().toISOString());
+}
+function saveLastPayload(payload) { storageSet(STORAGE.lastPayload, JSON.stringify(payload)); }
+function readLastPayload() { return safeJsonParse(storageGet(STORAGE.lastPayload)); }
 function eventName(type) { return type === 'high' ? 'Pleine mer' : 'Basse mer'; }
 function shortEventDate(dateKey) {
   const date = eventDate(dateKey, '12:00');
@@ -117,8 +156,8 @@ function countdownText(ms) {
 }
 function renderSolar(day) {
   const s=day.solar||{};
-  $('dawn').textContent=cleanTime(s.dawn); $('sunrise').textContent=cleanTime(s.sunrise);
-  $('sunset').textContent=cleanTime(s.sunset); $('dusk').textContent=cleanTime(s.dusk);
+  $('dawn').textContent=displayTime(s.dawn); $('sunrise').textContent=displayTime(s.sunrise);
+  $('sunset').textContent=displayTime(s.sunset); $('dusk').textContent=displayTime(s.dusk);
 }
 function minutesOf(time) { const [hh,mm] = String(time || '00:00').split(':').map(Number); return hh * 60 + mm; }
 function dayEventsWithNeighbors(dayIndex) {
@@ -232,7 +271,7 @@ function renderHeroCurve(day, now = new Date(), animate = true) {
     const left = Math.min(94, Math.max(6, (point.x / svgWidth) * 100));
     const isHigh = event.type === 'high';
     const top = isHigh ? point.y - 7 : point.y + 8;
-    return `<span class="curve-extrema ${isHigh ? 'is-high' : 'is-low'}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px"><span class="curve-kind">${isHigh ? 'PM' : 'BM'}</span><span class="curve-clock">${event.time}</span><span class="curve-height">${formatHeight(event.height)}</span></span>`;
+    return `<span class="curve-extrema ${isHigh ? 'is-high' : 'is-low'}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}px"><span class="curve-kind">${isHigh ? 'PM' : 'BM'}</span><span class="curve-clock">${displayTime(event.time)}</span><span class="curve-height">${formatHeight(event.height)}</span></span>`;
   }).join('');
 
   const curve = $('heroCurve')?.closest('.hero-curve');
@@ -244,7 +283,7 @@ function renderHeroCurve(day, now = new Date(), animate = true) {
 }
 
 function eventCard(e,dateKey) {
-  return `<article class="card event-card"><div class="event-date">${shortEventDate(dateKey)}</div><div class="event-time">${e.time}</div><div class="event-type">${eventName(e.type)}</div><div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div></article>`;
+  return `<article class="card event-card"><div class="event-date">${shortEventDate(dateKey)}</div><div class="event-time">${displayTime(e.time)}</div><div class="event-type">${eventName(e.type)}</div><div class="event-meta"><strong>${formatHeight(e.height)}</strong><span>${e.coefficient ? `Coef. ${e.coefficient}` : '&nbsp;'}</span></div></article>`;
 }
 function updateHeaderForDay(day, now=new Date()) {
   const shownDate=eventDate(day.date,'12:00');
@@ -279,7 +318,7 @@ function renderForecastHero(day) {
   $('tideDirection').textContent='Prévisions';
   $('currentTime').textContent=shortEventDate(day.date);
   $('nextLabel').textContent='PREMIÈRE MARÉE';
-  $('countdown').textContent=first.time;
+  $('countdown').textContent=displayTime(first.time);
   $('nextDate').textContent=shortEventDate(day.date);
   $('nextTime').textContent=eventName(first.type);
   $('nextType').textContent=first.coefficient?`Coefficient ${first.coefficient}`:'';
@@ -291,10 +330,10 @@ function updateLive(now=new Date()) {
   const {next,previous}=nextAndPrevious(now);
   const rising=previous.type==='low'&&next.type==='high';
   $('tideDirection').textContent=rising?'Marée montante':'Marée descendante';
-  $('currentTime').textContent=frDate(now,{hour:'2-digit',minute:'2-digit'});
+  $('currentTime').textContent=frDate(now,{hour:'2-digit',minute:'2-digit',hour12:!preferences.timeFormat24});
   $('nextLabel').textContent=`${eventName(next.type).toUpperCase()} DANS`;
   $('countdown').textContent=countdownText(next.at-now);
-  $('nextDate').textContent=shortEventDate(next.date); $('nextTime').textContent=next.time; $('nextType').textContent=eventName(next.type);
+  $('nextDate').textContent=shortEventDate(next.date); $('nextTime').textContent=displayTime(next.time); $('nextType').textContent=eventName(next.type);
   $('nextHeight').textContent=formatHeight(next.height); $('nextCoeff').textContent=next.coefficient?`Coefficient ${next.coefficient}`:'';
   renderHeroCurve(selectedDay(), now, false);
 }
@@ -306,7 +345,7 @@ function renderWeek() {
   $('weekList').innerHTML=days.map(day=>{
     const date=eventDate(day.date,'12:00');
     const name=frDate(date,{weekday:'long'}); const shortDate=frDate(date,{day:'numeric',month:'long'});
-    const events=day.events.map(e=>`<div class="day-event"><div class="mini-type">${shortType(e.type)}</div><div class="mini-time">${e.time}</div><div class="mini-height">${formatHeight(e.height)}</div><div class="mini-coeff">${e.coefficient?`Coef. ${e.coefficient}`:''}</div></div>`).join('');
+    const events=day.events.map(e=>`<div class="day-event"><div class="mini-type">${shortType(e.type)}</div><div class="mini-time">${displayTime(e.time)}</div><div class="mini-height">${formatHeight(e.height)}</div><div class="mini-coeff">${e.coefficient?`Coef. ${e.coefficient}`:''}</div></div>`).join('');
     return `<article class="card day-card"><div class="day-heading"><strong>${name[0].toUpperCase()+name.slice(1)}</strong><span>${shortDate}</span></div><div class="day-events">${events}</div></article>`;
   }).join('');
   const first=days[0],last=days.at(-1);
@@ -338,9 +377,193 @@ function bindNavigation() {
     window.scrollTo({top:0,behavior:'smooth'});
   });
 }
-function renderDataStatus() {
-  const updated=tideData.updated_at?new Date(tideData.updated_at):null;
-  $('dataStatus').textContent=updated&&!Number.isNaN(updated.valueOf())?`Actualisé ${frDate(updated,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'';
+function formattedUpdateDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.valueOf())) return 'Date inconnue';
+  const today = localDateKey();
+  const key = localDateKey(date);
+  const prefix = key === today ? 'aujourd’hui' : `le ${frDate(date,{day:'numeric',month:'long'})}`;
+  return `${prefix} à ${frDate(date,{hour:'2-digit',minute:'2-digit',hour12:!preferences.timeFormat24})}`;
+}
+function payloadAgeHours() {
+  const updated = tideData?.updated_at ? new Date(tideData.updated_at) : null;
+  return updated && !Number.isNaN(updated.valueOf()) ? (Date.now() - updated.valueOf()) / 3600000 : Infinity;
+}
+function statusIcon(kind) {
+  const icons = {
+    success: '<svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    loading: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    warning: '<svg viewBox="0 0 24 24"><path d="M12 4 21 20H3L12 4Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 9v5M12 17.2v.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    error: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5v6M12 16.7v.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    offline: '<svg viewBox="0 0 24 24"><path d="M4.5 9.5a11 11 0 0 1 15 0M7.5 12.5a6.8 6.8 0 0 1 9 0M10.5 15.5a2.8 2.8 0 0 1 3 0M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  };
+  return icons[kind] || icons.success;
+}
+function setDataStatus(kind, title, detail) {
+  const card = $('dataUpdateCard');
+  card.dataset.state = kind;
+  $('dataUpdateIcon').innerHTML = statusIcon(kind);
+  $('dataUpdateTitle').textContent = title;
+  $('dataUpdateDetail').textContent = detail;
+  $('refreshDataButton').disabled = isRefreshing;
+  if ($('settingsRefreshButton')) $('settingsRefreshButton').disabled = isRefreshing;
+  $('refreshDataButton').classList.toggle('spinning', kind === 'loading');
+  $('settingsDataState').textContent = title;
+  if ($('settingsLastUpdate')) $('settingsLastUpdate').textContent = tideData?.updated_at ? `Dernière mise à jour ${formattedUpdateDate(tideData.updated_at)}` : '—';
+}
+function renderDataStatus({ offline = !navigator.onLine, error = false } = {}) {
+  const updated = tideData?.updated_at;
+  $('dataStatus').textContent = updated ? `Actualisé ${formattedUpdateDate(updated)}` : '';
+  if (offline) {
+    setDataStatus('offline', 'Données disponibles hors ligne', updated ? `Dernière mise à jour ${formattedUpdateDate(updated)}` : 'Dernières données enregistrées');
+  } else if (error) {
+    setDataStatus('error', 'Impossible d’actualiser les données', updated ? `Dernières informations conservées · ${formattedUpdateDate(updated)}` : 'Réessayez avec une connexion internet');
+  } else if (payloadAgeHours() > 12) {
+    setDataStatus('warning', 'Actualisation recommandée', updated ? `Dernière mise à jour ${formattedUpdateDate(updated)}` : 'Données anciennes');
+  } else {
+    setDataStatus('success', 'Données actualisées', updated ? `Dernière mise à jour ${formattedUpdateDate(updated)}` : 'Données disponibles');
+  }
+  updateSettingsMetadata();
+}
+function applyPreferences({ rerender = true } = {}) {
+  document.documentElement.dataset.animations = preferences.animations ? 'on' : 'off';
+  const solarSection = document.querySelector('.solar-card')?.closest('.section-block');
+  if (solarSection) solarSection.hidden = !preferences.showSolar;
+  $('timeFormatSetting').checked = preferences.timeFormat24;
+  $('solarSetting').checked = preferences.showSolar;
+  $('animationsSetting').checked = preferences.animations;
+  if (rerender && tideData) {
+    if (activeView === 'todayView') renderSelectedDay(); else renderWeek();
+    renderDataStatus();
+  }
+}
+function updateSettingsMetadata() {
+  if (!tideData?.days?.length) return;
+  $('settingsStation').textContent = `${tideData.location || 'Tarnos'} · ${tideData.reference_port || 'Boucau-Bayonne / Biarritz'}`;
+  const first = tideData.days[0];
+  const last = tideData.days.at(-1);
+  $('settingsPeriod').textContent = `${shortEventDate(first.date)} – ${shortEventDate(last.date)} · ${tideData.days.length} jours`;
+  $('settingsLastUpdate').textContent = tideData.updated_at ? `Dernière mise à jour ${formattedUpdateDate(tideData.updated_at)}` : '—';
+  const lastModification = storageGet('marees-last-preference-change-v1');
+  $('settingsLastModification').textContent = lastModification ? `Dernière modification ${formattedUpdateDate(lastModification)}` : 'Aucune modification locale';
+  const lastBackup = storageGet(STORAGE.lastBackup);
+  $('lastBackupLabel').textContent = lastBackup ? `Dernière sauvegarde ${formattedUpdateDate(lastBackup)}` : 'Aucune sauvegarde exportée';
+  const previous = safeJsonParse(storageGet(STORAGE.previousPreferences));
+  $('restorePreviousSettingsButton').disabled = !previous;
+  $('previousSettingsLabel').textContent = previous?.savedAt ? `Copie créée ${formattedUpdateDate(previous.savedAt)}` : 'Aucune copie locale';
+}
+function showToast(message, kind = 'info') {
+  const toast = $('toast');
+  toast.textContent = message;
+  toast.dataset.kind = kind;
+  toast.hidden = false;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { toast.hidden = true; }, 2800);
+}
+function openSettings() {
+  updateSettingsMetadata();
+  $('settingsBackdrop').hidden = false;
+  $('settingsSheet').hidden = false;
+  document.body.classList.add('sheet-open');
+  setTimeout(() => $('closeSettingsButton').focus(), 0);
+}
+function closeSettings() {
+  $('settingsBackdrop').hidden = true;
+  $('settingsSheet').hidden = true;
+  $('importPreview').hidden = true;
+  pendingImport = null;
+  document.body.classList.remove('sheet-open');
+  $('settingsButton').focus();
+}
+function exportPreferences() {
+  const now = new Date();
+  const payload = {
+    suite: 'Applications personnelles',
+    app: 'Marées',
+    schemaVersion: 1,
+    appVersion: APP_VERSION,
+    exportedAt: now.toISOString(),
+    data: { selectedStation: tideData?.site_id || 'boucau-bayonne-biarritz', stationName: tideData?.location || 'Tarnos', favorites: [] },
+    settings: { ...preferences },
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const filenameDate = new Intl.DateTimeFormat('sv-SE',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(now).replace(' ','_').replace(':','-');
+  link.href = url;
+  link.download = `Marees_${filenameDate}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  storageSet(STORAGE.lastBackup, now.toISOString());
+  updateSettingsMetadata();
+  showToast('Sauvegarde exportée', 'success');
+}
+function validateImport(payload) {
+  if (!payload || payload.suite !== 'Applications personnelles' || payload.app !== 'Marées') throw new Error('Ce fichier ne correspond pas à l’application Marées.');
+  if (payload.schemaVersion !== 1) throw new Error('Cette version de sauvegarde n’est pas compatible.');
+  if (!payload.settings || typeof payload.settings !== 'object') throw new Error('Aucune préférence valide n’a été détectée.');
+  return payload;
+}
+function previewImport(payload) {
+  pendingImport = validateImport(payload);
+  $('importPreviewDate').textContent = formattedUpdateDate(payload.exportedAt);
+  $('importPreviewStation').textContent = payload.data?.stationName || 'Tarnos';
+  $('importPreviewFavorites').textContent = String(Array.isArray(payload.data?.favorites) ? payload.data.favorites.length : 0);
+  const detected = ['timeFormat24','showSolar','animations'].filter(key => key in payload.settings).length;
+  $('importPreviewPreferences').textContent = `${detected} préférence${detected > 1 ? 's' : ''}`;
+  $('importPreview').hidden = false;
+  $('confirmImportButton').focus();
+}
+function confirmImport() {
+  if (!pendingImport) return;
+  storageSet(STORAGE.previousPreferences, JSON.stringify({ savedAt: new Date().toISOString(), settings: { ...preferences } }));
+  savePreferences({ ...preferences, ...pendingImport.settings });
+  applyPreferences();
+  $('importPreview').hidden = true;
+  pendingImport = null;
+  updateSettingsMetadata();
+  showToast('Préférences restaurées', 'success');
+}
+function restorePreviousPreferences() {
+  const previous = safeJsonParse(storageGet(STORAGE.previousPreferences));
+  if (!previous?.settings) return;
+  const current = { savedAt: new Date().toISOString(), settings: { ...preferences } };
+  savePreferences(previous.settings);
+  storageSet(STORAGE.previousPreferences, JSON.stringify(current));
+  applyPreferences();
+  updateSettingsMetadata();
+  showToast('Copie locale restaurée', 'success');
+}
+function bindSettings() {
+  $('settingsButton').addEventListener('click', openSettings);
+  $('closeSettingsButton').addEventListener('click', closeSettings);
+  $('settingsBackdrop').addEventListener('click', closeSettings);
+  $('timeFormatSetting').addEventListener('change', event => { savePreferences({ ...preferences, timeFormat24: event.target.checked }); applyPreferences(); });
+  $('solarSetting').addEventListener('change', event => { savePreferences({ ...preferences, showSolar: event.target.checked }); applyPreferences(); });
+  $('animationsSetting').addEventListener('change', event => { savePreferences({ ...preferences, animations: event.target.checked }); applyPreferences({rerender:false}); });
+  $('settingsRefreshButton').addEventListener('click', () => refreshData({ manual: true }));
+  $('exportSettingsButton').addEventListener('click', exportPreferences);
+  $('importSettingsButton').addEventListener('click', () => $('importSettingsFile').click());
+  $('importSettingsFile').addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try { previewImport(JSON.parse(await file.text())); } catch (error) { showToast(error.message || 'Sauvegarde incorrecte', 'error'); }
+  });
+  $('cancelImportButton').addEventListener('click', () => { $('importPreview').hidden = true; pendingImport = null; });
+  $('confirmImportButton').addEventListener('click', confirmImport);
+  $('restorePreviousSettingsButton').addEventListener('click', restorePreviousPreferences);
+  document.addEventListener('keydown', event => {
+    if ($('settingsSheet').hidden) return;
+    if (event.key === 'Escape') { closeSettings(); return; }
+    if (event.key === 'Tab') {
+      const focusable = [...$('settingsSheet').querySelectorAll('button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(element => !element.hidden && element.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
 }
 function bindTabs() {
   document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{
@@ -349,6 +572,8 @@ function bindTabs() {
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     tab.classList.add('active');tab.setAttribute('aria-current','page');$(activeView).classList.add('active');
     $('dayRailSection').hidden = activeView !== 'todayView';
+    $('dataUpdateCard').hidden = activeView !== 'todayView';
+    if (!$('appError').hidden) $('appError').hidden = activeView !== 'todayView';
     if(activeView==='todayView') {
       $('previousDay').setAttribute('aria-label','Jour précédent');
       $('nextDay').setAttribute('aria-label','Jour suivant');
@@ -360,16 +585,69 @@ function bindTabs() {
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
-async function init() {
-  const response=await fetch(`/api/tides?days=30&v=${Date.now()}`,{cache:'no-store'});
-  if(!response.ok) throw new Error('Données indisponibles');
-  tideData=await response.json();
-  if(!Array.isArray(tideData.days)||!tideData.days.length) throw new Error('Données indisponibles');
-  selectedDayIndex=todayIndex(); selectedWeekIndex=Math.floor(selectedDayIndex/14);
-  renderSelectedDay(); renderDataStatus(); bindTabs(); bindNavigation(); scrollSelectedDayIntoView();
-  requestAnimationFrame(() => document.body.classList.add('app-ready'));
-  loadMissingSolar().then(()=>renderSolar(selectedDay())).catch(error=>console.warn(error));
-  setInterval(()=>updateLive(new Date()),30000);
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+async function fetchPayload() {
+  const response = await fetch('/api/tides?days=30', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Données indisponibles');
+  const payload = await response.json();
+  if (!Array.isArray(payload.days) || !payload.days.length) throw new Error('Données indisponibles');
+  return payload;
 }
-init().catch(()=>{document.body.innerHTML='<main class="app-shell"><p class="eyebrow">TARNOS</p><h1>Données indisponibles</h1><p class="date-line">Réessayez avec une connexion internet.</p></main>';});
+function renderApplication({ selectedDate = null } = {}) {
+  const matchingIndex = selectedDate ? tideData.days.findIndex(day => day.date === selectedDate) : -1;
+  selectedDayIndex = matchingIndex >= 0 ? matchingIndex : todayIndex();
+  selectedWeekIndex = Math.floor(selectedDayIndex / 14);
+  renderSelectedDay();
+  renderDataStatus();
+  updateSettingsMetadata();
+  scrollSelectedDayIntoView();
+  $('appError').hidden = true;
+  requestAnimationFrame(() => document.body.classList.add('app-ready'));
+}
+async function refreshData({ manual = false, initial = false } = {}) {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  setDataStatus('loading', 'Actualisation des données…', manual ? 'Mise à jour demandée' : 'Connexion en cours');
+  try {
+    const selectedDate = tideData?.days?.[selectedDayIndex]?.date || null;
+    const payload = await fetchPayload();
+    tideData = payload;
+    saveLastPayload(payload);
+    renderApplication({ selectedDate });
+    if (manual) showToast('Données actualisées', 'success');
+  } catch (error) {
+    const fallback = tideData || readLastPayload();
+    if (fallback?.days?.length) {
+      const selectedDate = tideData?.days?.[selectedDayIndex]?.date || null;
+      tideData = fallback;
+      renderApplication({ selectedDate });
+      renderDataStatus({ offline: !navigator.onLine, error: navigator.onLine });
+      if (manual) showToast(navigator.onLine ? 'Actualisation impossible · dernières données conservées' : 'Données disponibles hors ligne', 'warning');
+    } else {
+      $('appError').hidden = false;
+      $('appErrorTitle').textContent = navigator.onLine ? 'Données indisponibles' : 'Aucune donnée disponible hors ligne';
+      $('appErrorMessage').textContent = navigator.onLine ? 'Impossible d’actualiser les données. Réessayez dans quelques instants.' : 'Connectez-vous une première fois pour enregistrer les marées de cette station.';
+      setDataStatus(navigator.onLine ? 'error' : 'offline', navigator.onLine ? 'Échec de mise à jour' : 'Hors ligne', 'Aucune donnée enregistrée');
+    }
+  } finally {
+    isRefreshing = false;
+    $('refreshDataButton').disabled = false;
+    $('settingsRefreshButton').disabled = false;
+  }
+}
+async function init() {
+  applyPreferences({ rerender: false });
+  bindTabs();
+  bindNavigation();
+  bindSettings();
+  $('refreshDataButton').addEventListener('click', () => refreshData({ manual: true }));
+  $('retryButton').addEventListener('click', () => refreshData({ manual: true }));
+  window.addEventListener('online', () => refreshData({ manual: false }));
+  window.addEventListener('offline', () => { if (tideData) renderDataStatus({ offline: true }); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+  await refreshData({ initial: true });
+  if (tideData) {
+    loadMissingSolar().then(() => renderSolar(selectedDay())).catch(() => {});
+    setInterval(() => updateLive(new Date()), 30000);
+  }
+}
+init();
