@@ -1,6 +1,6 @@
 # Marées Tarnos — V4.2 conservatoire
 
-Cette version améliore l’application existante sans modifier son architecture, ses calculs, ses sources, sa station ni sa navigation.
+Cette. version améliore l’application existante sans modifier son architecture, ses calculs, ses sources, sa station ni sa navigation.
 
 ## Nouveautés ciblées
 
